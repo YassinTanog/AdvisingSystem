@@ -1,0 +1,186 @@
+<template>
+  <div class="container-fluid py-4">
+      <a-button v-if="currentUser.role == 'system_admin'" danger class="mb-2" type="primary" @click="showModal">Create Curriculum</a-button>
+     <a-table
+      bordered
+      rowKey="id"
+      :columns="columns"
+      :data-source="data"
+      :scroll="{ x: 600 }"
+      :pagination="{ pageSize: 10 }"
+    />
+    <a-modal v-model:visible="visible" title="Create Curriculum" centered @ok="createCurriculum">
+     <a-spin :spinning="loading" size="large">
+      <div class="mb-2">
+        <h6 class="p-0">Select College </h6>
+          <select
+            v-model="college_id"
+            @change="onChangeSelect"
+            class="form-select p-2 bg-white border"
+            style="font-size: 17px"
+            >
+            <option
+              style="font-size: 18px"
+              v-for="option in collegeList"
+              :value="option.id"
+              v-bind:key="option.id"
+              >
+              {{ option.code.toUpperCase() }} 
+            </option>
+          </select>
+      </div>
+      <div class="mb-2">
+        <h6 class="p-0">Select Department </h6>
+          <select
+            v-model="department_id"
+            @change="onChangeSelect2"
+            class="form-select p-2 bg-white border"
+            style="font-size: 17px"
+            >
+            <option
+              style="font-size: 18px"
+              v-for="option in departmentList"
+              :value="option.id"
+              v-bind:key="option.id"
+              >
+              {{ option.code.toUpperCase() }} 
+            </option>
+          </select>
+      </div>
+       <div class="mb-2">
+        <h6 class="p-0">Code</h6>
+        <a-input
+          size="large"
+          placeholder="Enter Curriculum Code"
+          v-model:value="code"
+          />
+      </div>
+      <div class="mb-2">
+        <h6 class="p-0">Description</h6>
+        <a-input
+          size="large"
+          placeholder="Enter Curriculum Description"
+          v-model:value="description"
+          />
+      </div>
+     </a-spin>
+    </a-modal>
+  </div>
+</template>
+
+<script>
+import { mapState } from "vuex";
+export default {
+  name: "curriculums",
+  data(){
+    return{
+    data: [],
+    code: "",
+    loading: false,
+    visible: false,
+    departmentList:[],
+    description: "",
+    department_id: null,
+    college_id: null,
+    college_code: "",
+    collegeList: [],
+    columns: [
+        {
+          title: 'Code',
+          width: 100,
+          customRender: (s) => s.record.code.toUpperCase() ,
+        },
+        {
+          title: 'Description',
+          customRender: (s) => <div>{s.record.description}</div> ,
+          width: 450,
+        },
+        {
+          title: 'Department',
+          customRender: (s) => <div>{s.record.department_description} ({s.record.department_code.toUpperCase()})</div> ,
+          width: 200,
+        },
+        {
+          title: 'College',
+          width: 100,
+          customRender: (s) => s.record.college_code.toUpperCase() ,
+        },
+      ],
+    }
+  },
+
+  computed: {
+    ...mapState(["currentUser"]),
+  },
+
+  mounted: function (){
+    this.fetchCurr()
+  },
+
+  methods: {
+    showModal: function(){
+      this.visible = true
+      this.fetchCollege()
+    },
+    fetchCollege(){
+       this.$secured.get('/api/v1/colleges')
+        .then(response => { this.collegeList = response.data})
+        .catch(error => { console.log(error) })
+    },
+    fetchCurr(){
+       this.$secured.get('/api/v1/curriculums')
+        .then(response => { this.data = response.data})
+        .catch(error => { console.log(error) })
+    },
+    fetchDepartment(){
+       this.$secured.get("/api/v1/get_department_by_college_id?college_id="+ this.college_id)
+        .then(response => { this.departmentList = response.data})
+        .catch(error => { console.log(error) })
+    },
+    onChangeSelect(event) {
+      this.college_id = event.target.value;
+      this.fetchDepartment()
+    },
+    onChangeSelect2(event) {
+      this.department_id = event.target.value;
+    },
+    createCurriculum(){
+      this.loading = true
+      this.$secured.post("/api/v1/curriculums", {curriculum: {
+        code: this.code.toLowerCase(),
+        description: this.description,
+        college_id: this.college_id,
+        department_id: this.department_id
+      }})
+      .then(response=>{
+        this.$toast.open({
+            message: "Succesfully Created",
+            type: "success",
+            position: "top-right",
+            duration: 2500,
+          })
+        console.log(response.data)
+        this.visible = false
+        this.fetchCurr()
+      })
+      .catch(error => {
+        this.$toast.open({
+            message: "Something is Wrong",
+            type: "warning",
+            position: "top-right",
+            duration: 2500,
+          });
+          this.loading = false
+          console.log(error.response.data.code)
+      })
+      this.code = ""
+      this.description = ""
+      this.department_id = null
+      this.college_id = null
+      this.college_code = ""
+      this.visible= false
+      this.loading = false
+    }
+  },
+};
+</script>
